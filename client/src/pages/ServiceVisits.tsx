@@ -1006,7 +1006,7 @@ export default function ServiceVisits() {
                 )}
               </div>
 
-              <div className={`grid ${selectedStatus === 'inquired' ? 'grid-cols-1' : 'grid-cols-2'} gap-6`}>
+              <div className={`grid ${selectedService.status === 'inquired' ? 'grid-cols-1' : 'grid-cols-2'} gap-6`}>
                 <div className="space-y-2">
                   <Label>Before Service Images</Label>
                   <Input 
@@ -1037,7 +1037,7 @@ export default function ServiceVisits() {
                   )}
                 </div>
 
-                {selectedStatus !== 'inquired' && (
+                {selectedService.status !== 'inquired' && (
                   <div className="space-y-2">
                     <Label>After Service Images</Label>
                     <Input 
