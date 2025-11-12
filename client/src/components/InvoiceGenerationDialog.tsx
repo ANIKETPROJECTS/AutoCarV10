@@ -516,14 +516,19 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
                                 render={({ field }) => (
                                   <FormItem>
                                     <Input
-                                      type="number"
+                                      type={item.isLabourCharge ? "text" : "number"}
                                       {...field}
                                       onChange={(e) => {
-                                        field.onChange(parseFloat(e.target.value) || 0);
                                         if (item.isLabourCharge) {
-                                          form.setValue(`items.${index}.total`, parseFloat(e.target.value) || 0);
-                                          recalculateTotals();
+                                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                                          const numValue = parseFloat(value) || 0;
+                                          if (numValue >= 0) {
+                                            field.onChange(numValue);
+                                            form.setValue(`items.${index}.total`, numValue);
+                                            recalculateTotals();
+                                          }
                                         } else {
+                                          field.onChange(parseFloat(e.target.value) || 0);
                                           updateItemTotal(index);
                                         }
                                       }}
@@ -700,14 +705,19 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
                               <FormItem>
                                 <FormLabel>{item.isLabourCharge ? "Charge Amount" : "Unit Price"}</FormLabel>
                                 <Input
-                                  type="number"
+                                  type={item.isLabourCharge ? "text" : "number"}
                                   {...field}
                                   onChange={(e) => {
-                                    field.onChange(parseFloat(e.target.value) || 0);
                                     if (item.isLabourCharge) {
-                                      form.setValue(`items.${index}.total`, parseFloat(e.target.value) || 0);
-                                      recalculateTotals();
+                                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                                      const numValue = parseFloat(value) || 0;
+                                      if (numValue >= 0) {
+                                        field.onChange(numValue);
+                                        form.setValue(`items.${index}.total`, numValue);
+                                        recalculateTotals();
+                                      }
                                     } else {
+                                      field.onChange(parseFloat(e.target.value) || 0);
                                       updateItemTotal(index);
                                     }
                                   }}
