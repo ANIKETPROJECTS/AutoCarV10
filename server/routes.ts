@@ -4044,8 +4044,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete vehicle
   app.delete("/api/registration/vehicles/:id", async (req, res) => {
     try {
+      // First find the vehicle to get the customerId
+      const vehicle = await RegistrationVehicle.findById(req.params.id);
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      
+      const customerId = vehicle.customerId;
+      
+      // Count how many vehicles this customer has
+      const vehicleCount = await RegistrationVehicle.countDocuments({ customerId });
+      
+      // Delete the vehicle
       await RegistrationVehicle.findByIdAndDelete(req.params.id);
-      res.json({ success: true });
+      
+      // If this was the last vehicle, also delete the customer
+      if (vehicleCount === 1) {
+        await RegistrationCustomer.findByIdAndDelete(customerId);
+        res.json({ success: true, customerDeleted: true });
+      } else {
+        res.json({ success: true, customerDeleted: false });
+      }
     } catch (error) {
       res.status(400).json({ error: "Failed to delete vehicle" });
     }

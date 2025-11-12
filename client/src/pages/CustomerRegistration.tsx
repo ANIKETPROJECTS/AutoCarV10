@@ -86,6 +86,7 @@ const warrantyCardSchema = z.object({
 const vehicleFormSchema = z.object({
   vehicleNumber: z.string().optional(),
   vehicleBrand: z.string().min(1, "Vehicle brand is required"),
+  customBrand: z.string().optional(),
   vehicleModel: z.string().min(1, "Vehicle model is required"),
   customModel: z.string().optional(),
   variant: z.enum(['Top', 'Base']).optional(),
@@ -113,6 +114,14 @@ const vehicleFormSchema = z.object({
 }, {
   message: "Vehicle number is required for used vehicles",
   path: ["vehicleNumber"],
+}).refine((data) => {
+  if (data.vehicleBrand === "Other" && !data.customBrand) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Please specify the brand name",
+  path: ["customBrand"],
 }).refine((data) => {
   if (data.vehicleModel === "Other" && !data.customModel) {
     return false;
@@ -172,6 +181,7 @@ export default function CustomerRegistration() {
     defaultValues: {
       vehicleNumber: "",
       vehicleBrand: "",
+      customBrand: "",
       vehicleModel: "Other",
       customModel: "",
       variant: undefined,
@@ -352,6 +362,7 @@ export default function CustomerRegistration() {
         ...data,
         customerId,
         vehicleNumber: data.vehicleNumber || undefined,
+        customBrand: data.vehicleBrand === "Other" ? data.customBrand : undefined,
         customModel: data.vehicleModel === "Other" ? data.customModel : undefined,
         yearOfPurchase: data.yearOfPurchase ? parseInt(data.yearOfPurchase) : undefined,
         isNewVehicle: data.isNewVehicle === "true",
@@ -386,6 +397,7 @@ export default function CustomerRegistration() {
       vehicleForm.reset({
         vehicleNumber: "",
         vehicleBrand: "",
+        customBrand: "",
         vehicleModel: "Other",
         customModel: "",
         variant: undefined,
@@ -1118,12 +1130,29 @@ export default function CustomerRegistration() {
                                   {brand}
                                 </SelectItem>
                               ))}
+                              <SelectItem value="Other">Other</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    {vehicleForm.watch("vehicleBrand") === "Other" && (
+                      <FormField
+                        control={vehicleForm.control}
+                        name="customBrand"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Specify Brand Name *</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter brand name" data-testid="input-custom-brand" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
                     <FormField
                       control={vehicleForm.control}
@@ -1345,20 +1374,22 @@ export default function CustomerRegistration() {
                         Please upload a clear photo of your vehicle for our records
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pb-6">
                       <FormField
                         control={vehicleForm.control}
                         name="vehiclePhoto"
                         render={({ field }) => (
                           <FormItem>
                             <FormControl>
-                              <Input 
-                                type="file" 
-                                accept="image/*"
-                                onChange={handlePhotoUpload}
-                                className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 dark:file:bg-emerald-700 dark:hover:file:bg-emerald-600"
-                                data-testid="input-vehicle-photo"
-                              />
+                              <div className="w-full">
+                                <Input 
+                                  type="file" 
+                                  accept="image/*"
+                                  onChange={handlePhotoUpload}
+                                  className="w-full cursor-pointer file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 dark:file:bg-emerald-700 dark:hover:file:bg-emerald-600"
+                                  data-testid="input-vehicle-photo"
+                                />
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
