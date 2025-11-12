@@ -21,7 +21,8 @@ const invoiceItemSchema = z.object({
   productId: z.string().optional(),
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  quantity: z.number().min(1, "Quantity must be at least 1"),
+  isLabourCharge: z.boolean().default(false),
+  quantity: z.number().min(1, "Quantity must be at least 1").default(1),
   unitPrice: z.number().min(0, "Price must be positive"),
   total: z.number(),
   hasGst: z.boolean().default(false),
@@ -65,7 +66,8 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
     defaultValues: {
       items: [{
         type: 'service' as const,
-        name: 'Service Charge',
+        name: 'Labour Charges',
+        isLabourCharge: true,
         quantity: 1,
         unitPrice: 0,
         total: 0,
@@ -149,6 +151,7 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
         type: 'product' as const,
         productId: productId,
         name: freshData?.name || part.productId?.name || 'Product',
+        isLabourCharge: false,
         quantity: part.quantity || 1,
         unitPrice: freshData?.price || part.price || 0,
         total: (part.quantity || 1) * (freshData?.price || part.price || 0),
@@ -179,6 +182,7 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
         type: 'product' as const,
         productId: product.productId,
         name: product.name,
+        isLabourCharge: false,
         quantity: 1,
         unitPrice: product.price || 0,
         total: product.price || 0,
@@ -196,10 +200,23 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
     console.log('  Unique Suggested Items:', uniqueSuggestedItems.length);
     console.log('  Total Items:', partsUsedItems.length + uniqueSuggestedItems.length);
 
-    const allItems = [...partsUsedItems, ...uniqueSuggestedItems];
+    const labourChargeItem = {
+      type: 'service' as const,
+      name: 'Labour Charges',
+      isLabourCharge: true,
+      quantity: 1,
+      unitPrice: 0,
+      total: 0,
+      hasGst: false,
+      gstAmount: 0,
+      hasWarranty: false,
+      warrantyCards: [],
+    };
+
+    const allItems = [labourChargeItem, ...partsUsedItems, ...uniqueSuggestedItems];
 
     if (allItems.length > 0) {
-      console.log('\n✅ Setting', allItems.length, 'items in form');
+      console.log('\n✅ Setting', allItems.length, 'items in form (including Labour Charges)');
       console.log('All Items:', allItems);
       form.setValue('items', allItems);
       setInitialItemsSet(true);
@@ -269,6 +286,26 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
       {
         type: 'product' as const,
         name: '',
+        isLabourCharge: false,
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        hasGst: false,
+        gstAmount: 0,
+        hasWarranty: false,
+        warrantyCards: [],
+      },
+    ]);
+  };
+
+  const addLabourCharge = () => {
+    const currentItems = form.getValues('items');
+    form.setValue('items', [
+      ...currentItems,
+      {
+        type: 'service' as const,
+        name: 'Labour Charges',
+        isLabourCharge: true,
         quantity: 1,
         unitPrice: 0,
         total: 0,
@@ -354,12 +391,18 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
             <Card>
               <CardContent className="pt-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-lg font-semibold">Items & Services</h3>
-                    <Button type="button" variant="outline" size="sm" onClick={addItem} data-testid="button-add-item">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Item
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={addItem} data-testid="button-add-item">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Item
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={addLabourCharge} data-testid="button-add-labour-charge">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Labour Charge
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="hidden md:block border rounded-lg overflow-x-auto">
@@ -443,24 +486,28 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
                               />
                             </TableCell>
                             <TableCell>
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.quantity`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <Input
-                                      type="number"
-                                      {...field}
-                                      onChange={(e) => {
-                                        field.onChange(parseFloat(e.target.value) || 0);
-                                        updateItemTotal(index);
-                                      }}
-                                      className="w-20"
-                                      data-testid={`input-item-quantity-${index}`}
-                                    />
-                                  </FormItem>
-                                )}
-                              />
+                              {!item.isLabourCharge ? (
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <Input
+                                        type="number"
+                                        {...field}
+                                        onChange={(e) => {
+                                          field.onChange(parseFloat(e.target.value) || 0);
+                                          updateItemTotal(index);
+                                        }}
+                                        className="w-20"
+                                        data-testid={`input-item-quantity-${index}`}
+                                      />
+                                    </FormItem>
+                                  )}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
                             </TableCell>
                             <TableCell>
                               <FormField
@@ -473,7 +520,12 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
                                       {...field}
                                       onChange={(e) => {
                                         field.onChange(parseFloat(e.target.value) || 0);
-                                        updateItemTotal(index);
+                                        if (item.isLabourCharge) {
+                                          form.setValue(`items.${index}.total`, parseFloat(e.target.value) || 0);
+                                          recalculateTotals();
+                                        } else {
+                                          updateItemTotal(index);
+                                        }
                                       }}
                                       className="w-24"
                                       data-testid={`input-item-price-${index}`}
@@ -483,39 +535,47 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
                               />
                             </TableCell>
                             <TableCell>
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.hasGst`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <input
-                                      type="checkbox"
-                                      checked={field.value}
-                                      onChange={() => toggleGst(index)}
-                                      className="h-4 w-4"
-                                      data-testid={`checkbox-gst-${index}`}
-                                    />
-                                  </FormItem>
-                                )}
-                              />
+                              {!item.isLabourCharge ? (
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.hasGst`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <input
+                                        type="checkbox"
+                                        checked={field.value}
+                                        onChange={() => toggleGst(index)}
+                                        className="h-4 w-4"
+                                        data-testid={`checkbox-gst-${index}`}
+                                      />
+                                    </FormItem>
+                                  )}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
                             </TableCell>
                             <TableCell>₹{item.total.toLocaleString()}</TableCell>
                             <TableCell>
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.hasWarranty`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <input
-                                      type="checkbox"
-                                      checked={field.value}
-                                      onChange={field.onChange}
-                                      className="h-4 w-4"
-                                      data-testid={`checkbox-warranty-${index}`}
-                                    />
-                                  </FormItem>
-                                )}
-                              />
+                              {!item.isLabourCharge ? (
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.hasWarranty`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <input
+                                        type="checkbox"
+                                        checked={field.value}
+                                        onChange={field.onChange}
+                                        className="h-4 w-4"
+                                        data-testid={`checkbox-warranty-${index}`}
+                                      />
+                                    </FormItem>
+                                  )}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
                             </TableCell>
                             <TableCell>
                               {items.length > 1 && (
@@ -612,37 +672,44 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
                           )}
                         />
                         
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.quantity`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Qty</FormLabel>
-                                <Input
-                                  type="number"
-                                  {...field}
-                                  onChange={(e) => {
-                                    field.onChange(parseFloat(e.target.value) || 0);
-                                    updateItemTotal(index);
-                                  }}
-                                  data-testid={`input-item-quantity-${index}`}
-                                />
-                              </FormItem>
-                            )}
-                          />
+                        <div className={item.isLabourCharge ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3"}>
+                          {!item.isLabourCharge && (
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.quantity`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Qty</FormLabel>
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    onChange={(e) => {
+                                      field.onChange(parseFloat(e.target.value) || 0);
+                                      updateItemTotal(index);
+                                    }}
+                                    data-testid={`input-item-quantity-${index}`}
+                                  />
+                                </FormItem>
+                              )}
+                            />
+                          )}
                           <FormField
                             control={form.control}
                             name={`items.${index}.unitPrice`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Unit Price</FormLabel>
+                                <FormLabel>{item.isLabourCharge ? "Charge Amount" : "Unit Price"}</FormLabel>
                                 <Input
                                   type="number"
                                   {...field}
                                   onChange={(e) => {
                                     field.onChange(parseFloat(e.target.value) || 0);
-                                    updateItemTotal(index);
+                                    if (item.isLabourCharge) {
+                                      form.setValue(`items.${index}.total`, parseFloat(e.target.value) || 0);
+                                      recalculateTotals();
+                                    } else {
+                                      updateItemTotal(index);
+                                    }
                                   }}
                                   data-testid={`input-item-price-${index}`}
                                 />
@@ -652,40 +719,42 @@ export function InvoiceGenerationDialog({ open, onOpenChange, serviceVisit }: In
                         </div>
                         
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.hasGst`}
-                              render={({ field }) => (
-                                <FormItem className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={field.value}
-                                    onChange={() => toggleGst(index)}
-                                    className="h-4 w-4"
-                                    data-testid={`checkbox-gst-${index}`}
-                                  />
-                                  <FormLabel className="!mt-0">GST</FormLabel>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.hasWarranty`}
-                              render={({ field }) => (
-                                <FormItem className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={field.value}
-                                    onChange={field.onChange}
-                                    className="h-4 w-4"
-                                    data-testid={`checkbox-warranty-${index}`}
-                                  />
-                                  <FormLabel className="!mt-0">Warranty</FormLabel>
-                                </FormItem>
-                              )}
-                            />
-                          </div>
+                          {!item.isLabourCharge && (
+                            <div className="flex items-center gap-4">
+                              <FormField
+                                control={form.control}
+                                name={`items.${index}.hasGst`}
+                                render={({ field }) => (
+                                  <FormItem className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={field.value}
+                                      onChange={() => toggleGst(index)}
+                                      className="h-4 w-4"
+                                      data-testid={`checkbox-gst-${index}`}
+                                    />
+                                    <FormLabel className="!mt-0">GST</FormLabel>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`items.${index}.hasWarranty`}
+                                render={({ field }) => (
+                                  <FormItem className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={field.value}
+                                      onChange={field.onChange}
+                                      className="h-4 w-4"
+                                      data-testid={`checkbox-warranty-${index}`}
+                                    />
+                                    <FormLabel className="!mt-0">Warranty</FormLabel>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          )}
                           <div className="text-right">
                             <FormLabel className="text-xs text-muted-foreground">Total</FormLabel>
                             <p className="font-semibold">₹{item.total.toLocaleString()}</p>
