@@ -33,7 +33,6 @@ import { VEHICLE_DATA } from "@shared/vehicleData";
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isStockDialogOpen, setIsStockDialogOpen] = useState(false);
@@ -47,20 +46,19 @@ export default function Products() {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
-    name: "",
     brand: "",
-    category: "",
+    model: "",
     mrp: "",
     sellingPrice: "",
     discount: "",
     stockQty: "",
     minStockLevel: "",
-    warehouseLocation: "",
     barcode: "",
     warranty: "",
-    images: [""],
+    warrantyCustom: "",
+    images: [] as string[],
     modelCompatibility: [""],
-    variants: [{ size: "", color: "" }],
+    variants: [{ size: "", color: "", colorCustom: "" }],
   });
 
   const { data: products = [], isLoading, error, refetch } = useQuery<any[]>({
@@ -205,35 +203,49 @@ export default function Products() {
 
   const resetForm = () => {
     setFormData({
-      name: "",
       brand: "",
-      category: "",
+      model: "",
       mrp: "",
       sellingPrice: "",
       discount: "",
       stockQty: "",
       minStockLevel: "",
-      warehouseLocation: "",
       barcode: "",
       warranty: "",
-      images: [""],
+      warrantyCustom: "",
+      images: [],
       modelCompatibility: [""],
-      variants: [{ size: "", color: "" }],
+      variants: [{ size: "", color: "", colorCustom: "" }],
     });
   };
 
-  const addImage = () => {
-    setFormData({ ...formData, images: [...formData.images, ""] });
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 5MB limit`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFormData(prev => ({ ...prev, images: [...prev.images, base64String] }));
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
     const newImages = formData.images.filter((_, i) => i !== index);
-    setFormData({ ...formData, images: newImages.length > 0 ? newImages : [""] });
-  };
-
-  const updateImage = (index: number, value: string) => {
-    const newImages = [...formData.images];
-    newImages[index] = value;
     setFormData({ ...formData, images: newImages });
   };
 
@@ -253,15 +265,15 @@ export default function Products() {
   };
 
   const addVariant = () => {
-    setFormData({ ...formData, variants: [...formData.variants, { size: "", color: "" }] });
+    setFormData({ ...formData, variants: [...formData.variants, { size: "", color: "", colorCustom: "" }] });
   };
 
   const removeVariant = (index: number) => {
     const newVariants = formData.variants.filter((_, i) => i !== index);
-    setFormData({ ...formData, variants: newVariants.length > 0 ? newVariants : [{ size: "", color: "" }] });
+    setFormData({ ...formData, variants: newVariants.length > 0 ? newVariants : [{ size: "", color: "", colorCustom: "" }] });
   };
 
-  const updateVariant = (index: number, field: 'size' | 'color', value: string) => {
+  const updateVariant = (index: number, field: 'size' | 'color' | 'colorCustom', value: string) => {
     const newVariants = [...formData.variants];
     newVariants[index][field] = value;
     setFormData({ ...formData, variants: newVariants });
@@ -269,15 +281,13 @@ export default function Products() {
 
   const handleExportProducts = () => {
     const exportData = products.map(product => ({
-      name: product.name,
       brand: product.brand,
-      category: product.category,
+      model: product.model || "",
       mrp: product.mrp,
       sellingPrice: product.sellingPrice,
       discount: product.discount,
       stockQty: product.stockQty,
       minStockLevel: product.minStockLevel,
-      warehouseLocation: product.warehouseLocation || "",
       barcode: product.barcode || "",
       warranty: product.warranty || "",
       status: product.status,
@@ -311,15 +321,13 @@ export default function Products() {
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
         const productsData = jsonData.map((row: any) => ({
-          name: row.name || row.Name,
           brand: row.brand || row.Brand,
-          category: row.category || row.Category,
+          model: row.model || row.Model || "",
           mrp: row.mrp || row.MRP || 0,
           sellingPrice: row.sellingPrice || row.SellingPrice || row.selling_price || 0,
           discount: row.discount || row.Discount || 0,
           stockQty: row.stockQty || row.StockQty || row.stock_qty || 0,
           minStockLevel: row.minStockLevel || row.MinStockLevel || row.min_stock_level || 10,
-          warehouseLocation: row.warehouseLocation || row.WarehouseLocation || row.warehouse_location || "",
           barcode: row.barcode || row.Barcode || "",
           warranty: row.warranty || row.Warranty || "",
           modelCompatibility: row.modelCompatibility 
@@ -347,12 +355,12 @@ export default function Products() {
     const sellingPrice = parseFloat(formData.sellingPrice);
     const discount = parseFloat(formData.discount) || 0;
     const stockQty = parseInt(formData.stockQty);
-    const minStockLevel = parseInt(formData.minStockLevel);
+    const minStockLevel = formData.minStockLevel ? parseInt(formData.minStockLevel) : 10;
     
-    if (!formData.name || !formData.brand || !formData.category) {
+    if (!formData.brand) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Please enter the brand",
         variant: "destructive",
       });
       return;
@@ -367,30 +375,33 @@ export default function Products() {
       return;
     }
     
-    if (isNaN(stockQty) || stockQty < 0 || isNaN(minStockLevel) || minStockLevel < 0) {
+    if (isNaN(stockQty) || stockQty < 0) {
       toast({
         title: "Validation Error",
-        description: "Please enter valid stock quantities",
+        description: "Please enter valid stock quantity",
         variant: "destructive",
       });
       return;
     }
     
+    const finalWarranty = formData.warranty === 'Other' ? formData.warrantyCustom : formData.warranty;
+    
     const productData = {
-      name: formData.name,
       brand: formData.brand,
-      category: formData.category,
+      model: formData.model,
       mrp,
       sellingPrice,
       discount,
       stockQty,
       minStockLevel,
-      warehouseLocation: formData.warehouseLocation,
       barcode: formData.barcode,
-      warranty: formData.warranty,
+      warranty: finalWarranty,
       images: formData.images.filter(img => img.trim() !== ""),
       modelCompatibility: formData.modelCompatibility.filter(m => m.trim() !== ""),
-      variants: formData.variants.filter(v => v.size || v.color),
+      variants: formData.variants.map(v => ({
+        size: v.size,
+        color: v.color === 'Other' ? v.colorCustom : v.color
+      })).filter(v => v.size || v.color),
     };
     
     createProductMutation.mutate(productData);
@@ -398,21 +409,31 @@ export default function Products() {
 
   const handleEditProduct = (product: any) => {
     setSelectedProduct(product);
+    const warrantyOptions = ['2YR', '1 Yr', '6 month', '1 month', 'NA'];
+    const isStandardWarranty = warrantyOptions.includes(product.warranty || '');
+    
     setFormData({
-      name: product.name || "",
       brand: product.brand || "",
-      category: product.category || "",
+      model: product.model || "",
       mrp: product.mrp?.toString() || "",
       sellingPrice: product.sellingPrice?.toString() || "",
       discount: product.discount?.toString() || "0",
       stockQty: product.stockQty?.toString() || "",
       minStockLevel: product.minStockLevel?.toString() || "",
-      warehouseLocation: product.warehouseLocation || "",
       barcode: product.barcode || "",
-      warranty: product.warranty || "",
-      images: (product.images && product.images.length > 0) ? product.images : [""],
+      warranty: isStandardWarranty ? product.warranty : 'Other',
+      warrantyCustom: isStandardWarranty ? '' : (product.warranty || ''),
+      images: (product.images && product.images.length > 0) ? product.images : [],
       modelCompatibility: (product.modelCompatibility && product.modelCompatibility.length > 0) ? product.modelCompatibility : [""],
-      variants: (product.variants && product.variants.length > 0) ? product.variants : [{ size: "", color: "" }],
+      variants: (product.variants && product.variants.length > 0) ? product.variants.map((v: any) => {
+        const colorOptions = ['Red', 'Blue', 'Black', 'White', 'Silver', 'Gray', 'Green', 'Yellow'];
+        const isStandardColor = colorOptions.includes(v.color || '');
+        return {
+          size: v.size || "",
+          color: isStandardColor ? v.color : 'Other',
+          colorCustom: isStandardColor ? '' : (v.color || '')
+        };
+      }) : [{ size: "", color: "", colorCustom: "" }],
     });
     setIsEditDialogOpen(true);
   };
@@ -424,12 +445,12 @@ export default function Products() {
     const sellingPrice = parseFloat(formData.sellingPrice);
     const discount = parseFloat(formData.discount) || 0;
     const stockQty = parseInt(formData.stockQty);
-    const minStockLevel = parseInt(formData.minStockLevel);
+    const minStockLevel = formData.minStockLevel ? parseInt(formData.minStockLevel) : 10;
     
-    if (!formData.name || !formData.brand || !formData.category) {
+    if (!formData.brand) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Please enter the brand",
         variant: "destructive",
       });
       return;
@@ -444,31 +465,34 @@ export default function Products() {
       return;
     }
     
-    if (isNaN(stockQty) || stockQty < 0 || isNaN(minStockLevel) || minStockLevel < 0) {
+    if (isNaN(stockQty) || stockQty < 0) {
       toast({
         title: "Validation Error",
-        description: "Please enter valid stock quantities",
+        description: "Please enter valid stock quantity",
         variant: "destructive",
       });
       return;
     }
     
     if (selectedProduct) {
+      const finalWarranty = formData.warranty === 'Other' ? formData.warrantyCustom : formData.warranty;
+      
       const productData = {
-        name: formData.name,
         brand: formData.brand,
-        category: formData.category,
+        model: formData.model,
         mrp,
         sellingPrice,
         discount,
         stockQty,
         minStockLevel,
-        warehouseLocation: formData.warehouseLocation,
         barcode: formData.barcode,
-        warranty: formData.warranty,
+        warranty: finalWarranty,
         images: formData.images.filter(img => img.trim() !== ""),
         modelCompatibility: formData.modelCompatibility.filter(m => m.trim() !== ""),
-        variants: formData.variants.filter(v => v.size || v.color),
+        variants: formData.variants.map(v => ({
+          size: v.size,
+          color: v.color === 'Other' ? v.colorCustom : v.color
+        })).filter(v => v.size || v.color),
       };
       
       updateProductMutation.mutate({
@@ -533,14 +557,11 @@ export default function Products() {
   };
 
   const filteredProducts = products.filter((product: any) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.model && product.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (product.barcode && product.barcode.includes(searchTerm));
-    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    return matchesSearch;
   });
-
-  const categories = ["all", ...Array.from(new Set(products.map((p: any) => p.category)))];
 
   const getStatusBadge = (status: string, stock: number) => {
     switch (status) {
@@ -559,16 +580,6 @@ export default function Products() {
     <form onSubmit={isEdit ? handleUpdateProduct : handleCreateProduct} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Product Name *</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
-            data-testid="input-product-name"
-          />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="brand">Brand *</Label>
           <Input
             id="brand"
@@ -578,32 +589,29 @@ export default function Products() {
             data-testid="input-product-brand"
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="category">Category *</Label>
+          <Label htmlFor="model">Model</Label>
           <Input
-            id="category"
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            required
-            placeholder="e.g., Engine Parts, Brakes"
-            data-testid="input-product-category"
+            id="model"
+            value={formData.model}
+            onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+            data-testid="input-product-model"
+            placeholder="e.g., XL 100, Activa 6G"
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="barcode">Barcode/QR Code</Label>
-          <div className="relative">
-            <Barcode className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="barcode"
-              value={formData.barcode}
-              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-              className="pl-10"
-              data-testid="input-product-barcode"
-            />
-          </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="barcode">Barcode/QR Code</Label>
+        <div className="relative">
+          <Barcode className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="barcode"
+            value={formData.barcode}
+            onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+            className="pl-10"
+            data-testid="input-product-barcode"
+          />
         </div>
       </div>
 
@@ -648,7 +656,7 @@ export default function Products() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="stockQty">Stock Quantity *</Label>
           <Input
@@ -661,71 +669,80 @@ export default function Products() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="minStockLevel">Min Stock Level *</Label>
+          <Label htmlFor="minStockLevel">Min Stock Level (Optional)</Label>
           <Input
             id="minStockLevel"
             type="number"
             value={formData.minStockLevel}
             onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })}
-            required
+            placeholder="Default: 10"
             data-testid="input-product-minstocklevel"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="warehouseLocation">Warehouse Location</Label>
-          <Input
-            id="warehouseLocation"
-            value={formData.warehouseLocation}
-            onChange={(e) => setFormData({ ...formData, warehouseLocation: e.target.value })}
-            data-testid="input-product-warehouse"
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="warranty">Warranty Information</Label>
-        <Input
-          id="warranty"
+        <Label htmlFor="warranty">Warranty</Label>
+        <Select
           value={formData.warranty}
-          onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
-          placeholder="e.g., 1 Year Manufacturer Warranty"
-          data-testid="input-product-warranty"
-        />
+          onValueChange={(value) => setFormData({ ...formData, warranty: value })}
+        >
+          <SelectTrigger data-testid="select-warranty">
+            <SelectValue placeholder="Select warranty" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="2YR">2YR</SelectItem>
+            <SelectItem value="1 Yr">1 Yr</SelectItem>
+            <SelectItem value="6 month">6 month</SelectItem>
+            <SelectItem value="1 month">1 month</SelectItem>
+            <SelectItem value="NA">NA</SelectItem>
+            <SelectItem value="Other">Other (Custom)</SelectItem>
+          </SelectContent>
+        </Select>
+        {formData.warranty === 'Other' && (
+          <Input
+            value={formData.warrantyCustom}
+            onChange={(e) => setFormData({ ...formData, warrantyCustom: e.target.value })}
+            placeholder="Enter custom warranty"
+            data-testid="input-warranty-custom"
+          />
+        )}
       </div>
 
       <div className="space-y-2">
         <Label>Product Images</Label>
-        {formData.images.map((image, index) => (
-          <div key={index} className="flex gap-2">
-            <Input
-              value={image}
-              onChange={(e) => updateImage(index, e.target.value)}
-              placeholder="Image URL"
-              data-testid={`input-image-${index}`}
-            />
-            {formData.images.length > 1 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => removeImage(index)}
-                data-testid={`button-remove-image-${index}`}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+        <div className="flex gap-2">
+          <Input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleImageUpload}
+            data-testid="input-product-images"
+          />
+        </div>
+        {formData.images.length > 0 && (
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {formData.images.map((image, index) => (
+              <div key={index} className="relative">
+                <img 
+                  src={image} 
+                  alt={`Product ${index + 1}`} 
+                  className="w-full h-24 object-cover rounded-md"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-1 right-1 h-6 w-6"
+                  onClick={() => removeImage(index)}
+                  data-testid={`button-remove-image-${index}`}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
           </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addImage}
-          data-testid="button-add-image"
-        >
-          <ImagePlus className="h-4 w-4 mr-2" />
-          Add Image
-        </Button>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -826,29 +843,52 @@ export default function Products() {
       <div className="space-y-2">
         <Label>Product Variants</Label>
         {formData.variants.map((variant, index) => (
-          <div key={index} className="flex gap-2">
-            <Input
-              value={variant.size}
-              onChange={(e) => updateVariant(index, 'size', e.target.value)}
-              placeholder="Size"
-              data-testid={`input-variant-size-${index}`}
-            />
-            <Input
-              value={variant.color}
-              onChange={(e) => updateVariant(index, 'color', e.target.value)}
-              placeholder="Color"
-              data-testid={`input-variant-color-${index}`}
-            />
-            {formData.variants.length > 1 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => removeVariant(index)}
-                data-testid={`button-remove-variant-${index}`}
+          <div key={index} className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                value={variant.size}
+                onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                placeholder="Size"
+                data-testid={`input-variant-size-${index}`}
+              />
+              <Select
+                value={variant.color}
+                onValueChange={(value) => updateVariant(index, 'color', value)}
               >
-                <X className="h-4 w-4" />
-              </Button>
+                <SelectTrigger data-testid={`select-variant-color-${index}`}>
+                  <SelectValue placeholder="Select color" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Red">Red</SelectItem>
+                  <SelectItem value="Blue">Blue</SelectItem>
+                  <SelectItem value="Black">Black</SelectItem>
+                  <SelectItem value="White">White</SelectItem>
+                  <SelectItem value="Silver">Silver</SelectItem>
+                  <SelectItem value="Gray">Gray</SelectItem>
+                  <SelectItem value="Green">Green</SelectItem>
+                  <SelectItem value="Yellow">Yellow</SelectItem>
+                  <SelectItem value="Other">Other (Custom)</SelectItem>
+                </SelectContent>
+              </Select>
+              {formData.variants.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => removeVariant(index)}
+                  data-testid={`button-remove-variant-${index}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {variant.color === 'Other' && (
+              <Input
+                value={variant.colorCustom}
+                onChange={(e) => updateVariant(index, 'colorCustom', e.target.value)}
+                placeholder="Enter custom color"
+                data-testid={`input-variant-color-custom-${index}`}
+              />
             )}
           </div>
         ))}
@@ -988,25 +1028,13 @@ export default function Products() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search products by name, brand, or barcode..."
+            placeholder="Search products by brand, model, or barcode..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
             data-testid="input-search"
           />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-category">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((cat: string) => (
-              <SelectItem key={cat} value={cat}>
-                {cat === "all" ? "All Categories" : cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {filteredProducts.length > 0 ? (
@@ -1018,8 +1046,10 @@ export default function Products() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-lg">{product.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">{product.brand}</p>
+                      <CardTitle className="text-lg">{product.brand}</CardTitle>
+                      {product.model && (
+                        <p className="text-sm text-muted-foreground mt-1">{product.model}</p>
+                      )}
                       {product.barcode && (
                         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                           <Barcode className="h-3 w-3" />
@@ -1035,7 +1065,7 @@ export default function Products() {
                     <div className="relative w-full h-40 bg-muted rounded-md overflow-hidden">
                       <img 
                         src={product.images[0]} 
-                        alt={product.name}
+                        alt={`${product.brand} ${product.model || 'Product'}`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;

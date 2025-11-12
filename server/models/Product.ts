@@ -6,9 +6,8 @@ const variantSchema = new mongoose.Schema({
 }, { _id: false });
 
 const productSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  category: { type: String, required: true },
   brand: { type: String, required: true },
+  model: { type: String, default: '' },
   modelCompatibility: [String],
   warranty: String,
   mrp: { type: Number, required: true },
@@ -23,7 +22,6 @@ const productSchema = new mongoose.Schema({
   },
   variants: [variantSchema],
   images: [String],
-  warehouseLocation: { type: String },
   barcode: { type: String },
   supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
 }, { timestamps: true });
