@@ -1427,7 +1427,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productIdsForDb: string[] = [];
       const originalToStripped = new Map<string, string>();
       
-      vehicle.selectedParts.forEach((id: string) => {
+      // Normalize selectedParts to handle both old (string[]) and new ({partId, quantity}[]) formats
+      const normalizedParts = normalizeSelectedParts(vehicle.selectedParts);
+      const partIds = normalizedParts.map(part => part.partId);
+      
+      console.log('Normalized selectedParts:', normalizedParts);
+      console.log('Extracted Part IDs:', partIds);
+      
+      partIds.forEach((id: string) => {
         const mongoId = id.startsWith('product-') ? id.replace('product-', '') : id;
         try {
           new mongoose.Types.ObjectId(mongoId);
@@ -1450,7 +1457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(([_, mongoId]) => foundDbProductIds.has(mongoId))
         .map(([originalId, _]) => originalId);
       
-      const predefinedPartIds = vehicle.selectedParts.filter((id: string) => 
+      const predefinedPartIds = partIds.filter((id: string) => 
         !foundDbProductOriginalIds.includes(id)
       );
 
@@ -4142,16 +4149,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete vehicle
   app.delete("/api/registration/vehicles/:id", async (req, res) => {
     try {
-      // First find the vehicle to get the customerId
+      // First find the vehicle to get the customerId and vehicle registration
       const vehicle = await RegistrationVehicle.findById(req.params.id);
       if (!vehicle) {
         return res.status(404).json({ error: "Vehicle not found" });
       }
       
       const customerId = vehicle.customerId;
+      const vehicleReg = vehicle.vehicleNumber || vehicle.vehicleId;
       
       // Count how many vehicles this customer has
       const vehicleCount = await RegistrationVehicle.countDocuments({ customerId });
+      
+      // Count service visits related to this vehicle before deletion
+      const serviceVisitCount = await ServiceVisit.countDocuments({
+        $or: [
+          { vehicleReg: vehicleReg },
+          { vehicleReg: vehicle.vehicleNumber },
+          { vehicleReg: vehicle.vehicleId }
+        ]
+      });
+      
+      // Cascade delete all service visits related to this vehicle
+      await ServiceVisit.deleteMany({
+        $or: [
+          { vehicleReg: vehicleReg },
+          { vehicleReg: vehicle.vehicleNumber },
+          { vehicleReg: vehicle.vehicleId }
+        ]
+      });
       
       // Delete the vehicle
       await RegistrationVehicle.findByIdAndDelete(req.params.id);
@@ -4159,9 +4185,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If this was the last vehicle, also delete the customer
       if (vehicleCount === 1) {
         await RegistrationCustomer.findByIdAndDelete(customerId);
-        res.json({ success: true, customerDeleted: true });
+        res.json({ 
+          success: true, 
+          customerDeleted: true,
+          serviceVisitsDeleted: serviceVisitCount 
+        });
       } else {
-        res.json({ success: true, customerDeleted: false });
+        res.json({ 
+          success: true, 
+          customerDeleted: false,
+          serviceVisitsDeleted: serviceVisitCount
+        });
       }
     } catch (error) {
       res.status(400).json({ error: "Failed to delete vehicle" });
