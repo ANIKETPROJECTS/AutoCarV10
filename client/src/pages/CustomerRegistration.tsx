@@ -152,8 +152,8 @@ export default function CustomerRegistration() {
   const [customerData, setCustomerData] = useState<any>(null);
   const [vehicleData, setVehicleData] = useState<any>(null);
   const [registeredVehicles, setRegisteredVehicles] = useState<any[]>([]);
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedBrand, setSelectedBrand] = useState<string>("Other");
+  const [selectedModel, setSelectedModel] = useState<string>("Other");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableParts, setAvailableParts] = useState<any[]>([]);
 
@@ -180,7 +180,7 @@ export default function CustomerRegistration() {
     resolver: zodResolver(vehicleFormSchema),
     defaultValues: {
       vehicleNumber: "",
-      vehicleBrand: "",
+      vehicleBrand: "Other",
       customBrand: "",
       vehicleModel: "Other",
       customModel: "",
