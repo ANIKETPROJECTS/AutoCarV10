@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle2, Car, User, MapPin, UploadCloud, PlusCircle, Search } from "lucide-react";
+import { CheckCircle2, Car, User, MapPin, UploadCloud, PlusCircle, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { getAllBrandNames, getModelsByBrand, getPartsByBrandAndModel } from "@shared/vehicleData";
 import { ScreenshotProtection } from "@/components/ScreenshotProtection";
 
@@ -163,6 +163,7 @@ export default function CustomerRegistration() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableParts, setAvailableParts] = useState<any[]>([]);
   const [partSearchTerm, setPartSearchTerm] = useState<string>("");
+  const [isProductListExpanded, setIsProductListExpanded] = useState<boolean>(false);
 
   const customerForm = useForm<CustomerFormData>({
     resolver: zodResolver(customerFormSchema),
