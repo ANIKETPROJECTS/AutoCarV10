@@ -29,6 +29,8 @@ export default function Inventory() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [isTransactionDetailOpen, setIsTransactionDetailOpen] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [returnProductSearchTerm, setReturnProductSearchTerm] = useState("");
   const { toast } = useToast();
 
   const [transactionFormData, setTransactionFormData] = useState({
@@ -308,7 +310,10 @@ export default function Inventory() {
           <p className="text-muted-foreground mt-1">Track stock movements, manage returns, and monitor inventory levels</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+          <Dialog open={isTransactionDialogOpen} onOpenChange={(open) => {
+            setIsTransactionDialogOpen(open);
+            if (!open) setProductSearchTerm("");
+          }}>
             <DialogTrigger asChild>
               <Button data-testid="button-new-transaction" className="hidden">
                 <Plus className="h-4 w-4 mr-2" />
@@ -334,7 +339,27 @@ export default function Inventory() {
                         <SelectValue placeholder="Select product" />
                       </SelectTrigger>
                       <SelectContent>
-                        {products.map((product: any) => (
+                        <div className="px-2 pb-2 sticky top-0 bg-popover">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search products..."
+                              className="pl-8 h-8"
+                              value={productSearchTerm}
+                              onChange={(e) => setProductSearchTerm(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              data-testid="input-search-product"
+                            />
+                          </div>
+                        </div>
+                        {products
+                          .filter((product: any) => {
+                            const displayName = (product.productName || product.name || product.model || "").toLowerCase();
+                            const brand = (product.brand || "").toLowerCase();
+                            const search = productSearchTerm.toLowerCase();
+                            return displayName.includes(search) || brand.includes(search);
+                          })
+                          .map((product: any) => (
                           <SelectItem key={product._id} value={product._id}>
                             {product.productName || product.name || product.model || "Unknown"} - {product.brand}
                           </SelectItem>
@@ -448,7 +473,10 @@ export default function Inventory() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isReturnDialogOpen} onOpenChange={setIsReturnDialogOpen}>
+          <Dialog open={isReturnDialogOpen} onOpenChange={(open) => {
+            setIsReturnDialogOpen(open);
+            if (!open) setReturnProductSearchTerm("");
+          }}>
             <DialogTrigger asChild>
               <Button variant="outline" data-testid="button-new-return">
                 <Undo2 className="h-4 w-4 mr-2" />
@@ -473,7 +501,27 @@ export default function Inventory() {
                       <SelectValue placeholder="Select product" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((product: any) => (
+                      <div className="px-2 pb-2 sticky top-0 bg-popover">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search products..."
+                            className="pl-8 h-8"
+                            value={returnProductSearchTerm}
+                            onChange={(e) => setReturnProductSearchTerm(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid="input-search-return-product"
+                          />
+                        </div>
+                      </div>
+                      {products
+                        .filter((product: any) => {
+                          const displayName = (product.productName || product.name || product.model || "").toLowerCase();
+                          const brand = (product.brand || "").toLowerCase();
+                          const search = returnProductSearchTerm.toLowerCase();
+                          return displayName.includes(search) || brand.includes(search);
+                        })
+                        .map((product: any) => (
                         <SelectItem key={product._id} value={product._id}>
                           {product.productName || product.name || product.model || "Unknown"} - {product.brand}
                         </SelectItem>
